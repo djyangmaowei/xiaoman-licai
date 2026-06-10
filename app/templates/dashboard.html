@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="dashboard-header">
+  <div>
+    <p class="eyebrow">家庭基金</p>
+    <h1>总览</h1>
+  </div>
+  <div class="status-pill">T+1 数据待更新</div>
+</section>
+
+<section class="metrics-grid" aria-label="核心指标">
+  <article class="metric">
+    <span>总资产</span>
+    <strong>--</strong>
+  </article>
+  <article class="metric">
+    <span>单位净值</span>
+    <strong>1.0000</strong>
+  </article>
+  <article class="metric">
+    <span>现金余额</span>
+    <strong>--</strong>
+  </article>
+  <article class="metric">
+    <span>当前预警</span>
+    <strong>0</strong>
+  </article>
+</section>
+
+<section class="panel">
+  <h2>今日待办</h2>
+  <p>录入资金流水和产品买卖后，系统会计算份额、现金、持仓和每日估值。</p>
+</section>
+{% endblock %}

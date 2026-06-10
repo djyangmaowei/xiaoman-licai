@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}小满理财{% endblock %}</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">小</span>
+        <span class="brand-text">小满理财</span>
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <a href="/">总览</a>
+        <a href="/holdings">持仓</a>
+        <a href="/ledger">流水</a>
+        <a href="/updates">数据更新</a>
+        <a href="/alerts">预警</a>
+      </nav>
+    </header>
+    <main class="page">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

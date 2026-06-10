@@ -1,10 +1,12 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router as app_router
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="小满理财")
+    app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     @app.get("/health")
     def health_check() -> dict[str, str]:
