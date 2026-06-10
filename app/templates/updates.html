@@ -1,8 +1,68 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>数据更新</h1>
-<section class="panel">
-  <p>系统每天定时更新 T+1 数据，也支持管理员手动补跑。</p>
+<section class="dashboard-header">
+  <div>
+    <p class="eyebrow">T+1 价格</p>
+    <h1>数据更新</h1>
+  </div>
+  <div class="status-pill">手动补跑</div>
+</section>
+
+{% if message %}
+  <section class="notice positive">{{ message }}</section>
+{% endif %}
+
+{% if error %}
+  <section class="notice negative">{{ error }}</section>
+{% endif %}
+
+<section class="panel form-panel">
+  <form method="post" action="/updates/run">
+    <label>
+      更新日期
+      <input type="date" name="target_date">
+    </label>
+    <button class="primary-action" type="submit">更新 T+1 数据</button>
+  </form>
+</section>
+
+<section class="panel table-panel ledger-history">
+  <h2>最近价格记录</h2>
+  {% if price_rows %}
+    <table>
+      <thead>
+        <tr>
+          <th>产品</th>
+          <th>代码</th>
+          <th>日期</th>
+          <th>价格/净值</th>
+          <th>来源</th>
+          <th>状态</th>
+          <th>错误</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for point, product in price_rows %}
+          <tr>
+            <td>
+              <strong>{{ product.asset_class }}</strong>
+              <span>{{ product.name }}</span>
+            </td>
+            <td>{{ product.code }}</td>
+            <td>{{ point.price_date }}</td>
+            <td>{% if point.price is not none %}{{ point.price|number4 }}{% else %}—{% endif %}</td>
+            <td>{{ point.source }}</td>
+            <td class="{% if point.status == 'success' %}positive{% else %}negative{% endif %}">
+              {{ point.status }}
+            </td>
+            <td>{{ point.error_message or "—" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>暂无价格记录。</p>
+  {% endif %}
 </section>
 {% endblock %}
