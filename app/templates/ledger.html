@@ -86,6 +86,47 @@
   </form>
 </section>
 
+<section class="panel form-panel ledger-history">
+  <h2>卖出持仓</h2>
+  <form method="post" action="/ledger/sell">
+    <label>
+      交易日期
+      <input type="date" name="trade_date" value="{{ today }}" required>
+    </label>
+
+    <label>
+      卖出产品
+      <select name="product_id" required>
+        {% for product in products %}
+          <option value="{{ product.id }}">{{ product.asset_class }} · {{ product.name }} · {{ product.code }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <div class="form-grid">
+      <label>
+        卖出金额
+        <input type="number" name="amount" step="0.01" min="0.01" placeholder="3000.00" required>
+      </label>
+      <label>
+        成交价格/净值
+        <input type="number" name="price" step="0.0001" min="0.0001" placeholder="1.0000" required>
+      </label>
+      <label>
+        手续费
+        <input type="number" name="fee" step="0.01" min="0" value="0.00" required>
+      </label>
+    </div>
+
+    <label>
+      备注
+      <textarea name="note" rows="3" placeholder="例如：部分止盈，资金回到现金仓"></textarea>
+    </label>
+
+    <button class="primary-action" type="submit">确认卖出</button>
+  </form>
+</section>
+
 <section class="panel table-panel ledger-history">
   <h2>最近流水</h2>
   {% if entries %}
@@ -99,6 +140,7 @@
           <th>数量</th>
           <th>手续费</th>
           <th>资金</th>
+          <th>备注</th>
           <th>操作</th>
         </tr>
       </thead>
@@ -108,13 +150,22 @@
             <td>{{ entry.trade.trade_date }}</td>
             <td>
               <strong>{{ entry.product.asset_class }}</strong>
-              <span>{{ entry.product.name }} · {{ entry.product.code }}</span>
+              <span>{% if entry.trade.trade_type == "SELL" %}卖出{% else %}买入{% endif %} · {{ entry.product.name }} · {{ entry.product.code }}</span>
             </td>
             <td>{{ entry.trade.amount|money }}</td>
             <td>{{ entry.trade.price|number4 }}</td>
             <td>{{ entry.trade.quantity|number4 }}</td>
             <td>{{ entry.trade.fee|money }}</td>
-            <td>{% if entry.uses_existing_cash %}现金仓{% else %}新增份额{% endif %}</td>
+            <td>
+              {% if entry.trade.trade_type == "SELL" %}
+                回到现金
+              {% elif entry.uses_existing_cash %}
+                现金仓
+              {% else %}
+                新增份额
+              {% endif %}
+            </td>
+            <td>{{ entry.trade.note or "—" }}</td>
             <td><a class="text-action" href="/ledger/trades/{{ entry.trade.id }}/edit">编辑</a></td>
           </tr>
         {% endfor %}

@@ -10,12 +10,17 @@ from sqlalchemy.orm import Session
 
 from app.api import alerts, ledger, products, valuation
 from app.db.session import get_db
+from app.jobs.update_prices import run_price_update
+from app.models.market_data import PricePoint
+from app.models.product import Product
 from app.services.portfolio_service import (
     create_combined_buy,
+    create_sell,
     get_ledger_entry,
     list_recent_ledger_entries,
     snapshot_portfolio,
     update_combined_buy,
+    update_sell,
 )
 from app.services.product_service import get_or_create_product, list_active_products
 from app.ui.formatters import money, number4, percent
@@ -99,6 +104,31 @@ def submit_ledger_entry(
     return RedirectResponse("/", status_code=303)
 
 
+@router.post("/ledger/sell")
+def submit_sell_entry(
+    trade_date: date = Form(...),
+    product_id: int = Form(...),
+    amount: Decimal = Form(...),
+    price: Decimal = Form(...),
+    fee: Decimal = Form(Decimal("0")),
+    note: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    try:
+        create_sell(
+            db=db,
+            trade_date=trade_date,
+            product_id=product_id,
+            amount=amount,
+            price=price,
+            fee=fee,
+            note=note,
+        )
+    except ValueError as exc:
+        return RedirectResponse(f"/ledger?error={str(exc)}", status_code=303)
+    return RedirectResponse("/", status_code=303)
+
+
 @router.get("/ledger/trades/{trade_id}/edit")
 def edit_ledger_entry(trade_id: int, request: Request, db: Session = Depends(get_db)):
     entry = get_ledger_entry(db, trade_id)
@@ -128,25 +158,76 @@ def update_ledger_entry(
     db: Session = Depends(get_db),
 ):
     try:
-        update_combined_buy(
-            db=db,
-            trade_id=trade_id,
-            trade_date=trade_date,
-            product_id=product_id,
-            amount=amount,
-            price=price,
-            fee=fee,
-            use_existing_cash=use_existing_cash,
-            note=note,
-        )
+        entry = get_ledger_entry(db, trade_id)
+        if entry is None:
+            raise ValueError("trade not found")
+        if entry.trade.trade_type == "SELL":
+            update_sell(
+                db=db,
+                trade_id=trade_id,
+                trade_date=trade_date,
+                product_id=product_id,
+                amount=amount,
+                price=price,
+                fee=fee,
+                note=note,
+            )
+        else:
+            update_combined_buy(
+                db=db,
+                trade_id=trade_id,
+                trade_date=trade_date,
+                product_id=product_id,
+                amount=amount,
+                price=price,
+                fee=fee,
+                use_existing_cash=use_existing_cash,
+                note=note,
+            )
     except ValueError as exc:
         return RedirectResponse(f"/ledger/trades/{trade_id}/edit?error={str(exc)}", status_code=303)
     return RedirectResponse("/ledger", status_code=303)
 
 
 @router.get("/updates")
-def updates(request: Request):
-    return templates.TemplateResponse(request, "updates.html")
+def updates(request: Request, db: Session = Depends(get_db)):
+    raw_price_rows = (
+        db.query(PricePoint, Product)
+        .join(Product, Product.id == PricePoint.product_id)
+        .order_by(PricePoint.price_date.desc(), PricePoint.id.desc())
+        .limit(100)
+        .all()
+    )
+    price_rows = []
+    seen_product_ids: set[int] = set()
+    for point, product in raw_price_rows:
+        if product.id in seen_product_ids:
+            continue
+        seen_product_ids.add(product.id)
+        price_rows.append((point, product))
+    return templates.TemplateResponse(
+        request,
+        "updates.html",
+        {
+            "price_rows": price_rows,
+            "message": request.query_params.get("message"),
+            "error": request.query_params.get("error"),
+        },
+    )
+
+
+@router.post("/updates/run")
+def run_updates(target_date: str | None = Form(None), db: Session = Depends(get_db)):
+    try:
+        parsed_date = date.fromisoformat(target_date) if target_date else None
+        summary = run_price_update(target_date=parsed_date, db=db)
+    except ValueError as exc:
+        return RedirectResponse(f"/updates?error={str(exc)}", status_code=303)
+    message = (
+        f"{summary.target_date.isoformat()} attempted={summary.attempted} "
+        f"succeeded={summary.succeeded} failed={summary.failed}"
+    )
+    return RedirectResponse(f"/updates?message={message}", status_code=303)
 
 
 @router.get("/alerts")
