@@ -22,12 +22,40 @@
 
     <label>
       买入产品
-      <select name="product_id" required>
+      <select name="product_id">
+        <option value="">选择已有产品，或在下方录入新产品</option>
         {% for product in products %}
           <option value="{{ product.id }}">{{ product.asset_class }} · {{ product.name }} · {{ product.code }}</option>
         {% endfor %}
       </select>
     </label>
+
+    <section class="sub-panel">
+      <h2>录入新产品</h2>
+      <div class="form-grid">
+        <label>
+          资产类别
+          <input type="text" name="new_asset_class" placeholder="例如：个股 / 银行保险 / 白酒">
+        </label>
+        <label>
+          产品名称
+          <input type="text" name="new_product_name" placeholder="例如：贵州茅台">
+        </label>
+        <label>
+          产品代码
+          <input type="text" name="new_product_code" placeholder="例如：600519">
+        </label>
+      </div>
+      <label>
+        交易渠道
+        <select name="new_channel">
+          <option value="stock">A股股票</option>
+          <option value="exchange">场内基金 / ETF</option>
+          <option value="otc">场外基金</option>
+          <option value="manual">手动产品</option>
+        </select>
+      </label>
+    </section>
 
     <div class="form-grid">
       <label>

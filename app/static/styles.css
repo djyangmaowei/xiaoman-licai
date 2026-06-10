@@ -134,12 +134,18 @@ h2 {
 }
 
 .metric,
-.panel {
+.panel,
+.sub-panel {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 22px;
   box-shadow: var(--shadow);
   padding: 20px;
+}
+
+.sub-panel {
+  background: rgba(255, 247, 250, 0.72);
+  box-shadow: none;
 }
 
 .metric span,

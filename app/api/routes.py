@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.api import alerts, ledger, products, valuation
 from app.db.session import get_db
 from app.services.portfolio_service import create_combined_buy, snapshot_portfolio
-from app.services.product_service import list_active_products
+from app.services.product_service import get_or_create_product, list_active_products
 from app.ui.formatters import money, number4, percent
 
 router = APIRouter()
@@ -53,7 +53,11 @@ def ledger_page(request: Request, db: Session = Depends(get_db)):
 @router.post("/ledger")
 def submit_ledger_entry(
     trade_date: date = Form(...),
-    product_id: int = Form(...),
+    product_id: int | None = Form(None),
+    new_product_name: str | None = Form(None),
+    new_product_code: str | None = Form(None),
+    new_asset_class: str | None = Form(None),
+    new_channel: str = Form("manual"),
     amount: Decimal = Form(...),
     price: Decimal = Form(...),
     fee: Decimal = Form(Decimal("0")),
@@ -62,6 +66,17 @@ def submit_ledger_entry(
     db: Session = Depends(get_db),
 ):
     try:
+        if new_product_code and new_product_name and new_asset_class:
+            product = get_or_create_product(
+                db=db,
+                asset_class=new_asset_class,
+                name=new_product_name,
+                code=new_product_code,
+                channel=new_channel,
+            )
+            product_id = product.id
+        if product_id is None:
+            raise ValueError("please select an existing product or enter a new product")
         create_combined_buy(
             db=db,
             trade_date=trade_date,
