@@ -5,3 +5,7 @@
 ## Local checks
 
 Run `pytest -v` and `ruff check .` before handing off changes.
+
+## Deployment
+
+See [腾讯云部署 Runbook](docs/deployment/tencent-cloud.md).

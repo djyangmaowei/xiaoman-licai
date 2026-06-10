@@ -1,0 +1,26 @@
+services:
+  web:
+    build: .
+    container_name: xiaoman-web
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+psycopg://xiaoman:xiaoman-dev-password@db:5432/xiaoman
+      APP_SECRET_KEY: change-me-before-deploy
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: change-me-before-deploy
+    ports:
+      - "8000:8000"
+
+  db:
+    image: postgres:16
+    container_name: xiaoman-db
+    environment:
+      POSTGRES_DB: xiaoman
+      POSTGRES_USER: xiaoman
+      POSTGRES_PASSWORD: xiaoman-dev-password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
