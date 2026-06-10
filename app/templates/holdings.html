@@ -1,8 +1,51 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>持仓</h1>
-<section class="panel">
-  <p>真实持仓录入后，会显示产品市值、盈亏、当前仓位和目标仓位偏离。</p>
+<section class="dashboard-header">
+  <div>
+    <p class="eyebrow">组合资产</p>
+    <h1>持仓</h1>
+  </div>
+  <div class="status-pill">总资产 {{ snapshot.total_assets|money }}</div>
+</section>
+
+<section class="panel table-panel">
+  {% if snapshot.holdings %}
+    <table>
+      <thead>
+        <tr>
+          <th>产品</th>
+          <th>代码</th>
+          <th>数量</th>
+          <th>价格</th>
+          <th>市值</th>
+          <th>仓位</th>
+          <th>目标</th>
+          <th>盈亏</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in snapshot.holdings %}
+          <tr>
+            <td>
+              <strong>{{ row.product.asset_class }}</strong>
+              <span>{{ row.product.name }}</span>
+            </td>
+            <td>{{ row.product.code }}</td>
+            <td>{{ row.quantity|number4 }}</td>
+            <td>{{ row.price|number4 }}</td>
+            <td>{{ row.market_value|money }}</td>
+            <td>{{ row.weight|percent }}</td>
+            <td>{{ row.target_weight|percent }}</td>
+            <td class="{% if row.profit >= 0 %}positive{% else %}negative{% endif %}">
+              {{ row.profit|money }}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>暂无持仓。请先录入流水。</p>
+  {% endif %}
 </section>
 {% endblock %}

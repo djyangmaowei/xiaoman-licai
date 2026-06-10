@@ -1,8 +1,60 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>流水</h1>
-<section class="panel">
-  <p>资金投入影响家庭基金份额，内部买卖只影响现金和持仓。</p>
+<section class="dashboard-header">
+  <div>
+    <p class="eyebrow">基金级账本</p>
+    <h1>流水录入</h1>
+  </div>
+  <div class="status-pill">管理员录入</div>
+</section>
+
+{% if error %}
+  <section class="notice negative">{{ error }}</section>
+{% endif %}
+
+<section class="panel form-panel">
+  <form method="post" action="/ledger">
+    <label>
+      交易日期
+      <input type="date" name="trade_date" value="{{ today }}" required>
+    </label>
+
+    <label>
+      买入产品
+      <select name="product_id" required>
+        {% for product in products %}
+          <option value="{{ product.id }}">{{ product.asset_class }} · {{ product.name }} · {{ product.code }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <div class="form-grid">
+      <label>
+        买入金额
+        <input type="number" name="amount" step="0.01" min="0.01" placeholder="10000.00" required>
+      </label>
+      <label>
+        成交价格/净值
+        <input type="number" name="price" step="0.0001" min="0.0001" placeholder="1.0000" required>
+      </label>
+      <label>
+        手续费
+        <input type="number" name="fee" step="0.01" min="0" value="0.00" required>
+      </label>
+    </div>
+
+    <label class="checkbox-row">
+      <input type="checkbox" name="use_existing_cash" value="true">
+      这笔买入使用已有现金仓，不新增家庭基金份额
+    </label>
+
+    <label>
+      备注
+      <textarea name="note" rows="3" placeholder="例如：第一笔建仓，来自本月新增资金"></textarea>
+    </label>
+
+    <button class="primary-action" type="submit">确认入账</button>
+  </form>
 </section>
 {% endblock %}

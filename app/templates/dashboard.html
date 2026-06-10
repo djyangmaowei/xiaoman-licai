@@ -3,33 +3,58 @@
 {% block content %}
 <section class="dashboard-header">
   <div>
-    <p class="eyebrow">家庭基金</p>
-    <h1>总览</h1>
+    <p class="eyebrow">家庭基金净值账本</p>
+    <h1>小满理财总览</h1>
   </div>
-  <div class="status-pill">T+1 数据待更新</div>
+  <div class="status-pill">本地账本已连接</div>
 </section>
 
 <section class="metrics-grid" aria-label="核心指标">
   <article class="metric">
     <span>总资产</span>
-    <strong>--</strong>
+    <strong>{{ snapshot.total_assets|money }}</strong>
   </article>
   <article class="metric">
     <span>单位净值</span>
-    <strong>1.0000</strong>
+    <strong>{{ snapshot.unit_nav|number4 }}</strong>
   </article>
   <article class="metric">
     <span>现金余额</span>
-    <strong>--</strong>
+    <strong>{{ snapshot.cash|money }}</strong>
   </article>
   <article class="metric">
-    <span>当前预警</span>
-    <strong>0</strong>
+    <span>总份额</span>
+    <strong>{{ snapshot.total_shares|number4 }}</strong>
   </article>
 </section>
 
-<section class="panel">
-  <h2>今日待办</h2>
-  <p>录入资金流水和产品买卖后，系统会计算份额、现金、持仓和每日估值。</p>
+<section class="split-layout">
+  <article class="panel">
+    <h2>持仓概览</h2>
+    {% if snapshot.holdings %}
+      <div class="mini-list">
+        {% for row in snapshot.holdings %}
+          <div class="mini-row">
+            <div>
+              <strong>{{ row.product.asset_class }}</strong>
+              <span>{{ row.product.name }}</span>
+            </div>
+            <div class="mini-number">
+              <strong>{{ row.market_value|money }}</strong>
+              <span>{{ row.weight|percent }}</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p>还没有录入持仓。先到“流水”录入一笔资金和产品买入，系统会自动生成份额和净值。</p>
+    {% endif %}
+  </article>
+
+  <article class="panel accent-panel">
+    <h2>下一步</h2>
+    <p>录入“用 X 元买入 Y 产品”后，系统会同时写入外部资金流水、内部买入流水，并重新计算小满理财单位净值。</p>
+    <a class="primary-action" href="/ledger">录入流水</a>
+  </article>
 </section>
 {% endblock %}
