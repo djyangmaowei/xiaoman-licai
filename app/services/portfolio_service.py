@@ -33,6 +33,13 @@ class PortfolioSnapshot:
     holdings: list[HoldingRow]
 
 
+@dataclass(frozen=True)
+class LedgerEntry:
+    trade: Trade
+    product: Product
+    uses_existing_cash: bool
+
+
 def current_unit_nav(db: Session) -> Decimal:
     latest = db.query(DailyValuation).order_by(DailyValuation.valuation_date.desc()).first()
     return latest.unit_nav if latest else Decimal("1.0000")
@@ -62,6 +69,40 @@ def _latest_price(db: Session, product_id: int, fallback: Decimal) -> Decimal:
         .first()
     )
     return price.price if price and price.price is not None else fallback
+
+
+def _matching_fund_flow(db: Session, trade: Trade) -> FundFlow | None:
+    return (
+        db.query(FundFlow)
+        .filter(
+            FundFlow.flow_type == "SUBSCRIBE",
+            FundFlow.trade_date == trade.trade_date,
+            FundFlow.amount == trade.amount,
+            FundFlow.note == (trade.note or f"外部投入并买入 {db.get(Product, trade.product_id).name}"),
+        )
+        .order_by(FundFlow.id.desc())
+        .first()
+    )
+
+
+def _upsert_valuation(db: Session, valuation_date: date) -> None:
+    snapshot = snapshot_portfolio(db)
+    valuation = db.query(DailyValuation).filter(DailyValuation.valuation_date == valuation_date).first()
+    if valuation is None:
+        db.add(
+            DailyValuation(
+                valuation_date=valuation_date,
+                cash=snapshot.cash,
+                total_assets=snapshot.total_assets,
+                total_shares=snapshot.total_shares,
+                unit_nav=snapshot.unit_nav,
+            )
+        )
+    else:
+        valuation.cash = snapshot.cash
+        valuation.total_assets = snapshot.total_assets
+        valuation.total_shares = snapshot.total_shares
+        valuation.unit_nav = snapshot.unit_nav
 
 
 def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
@@ -122,6 +163,37 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
     )
 
 
+def list_recent_ledger_entries(db: Session, limit: int = 20) -> list[LedgerEntry]:
+    trades = db.query(Trade).order_by(Trade.trade_date.desc(), Trade.id.desc()).limit(limit).all()
+    entries: list[LedgerEntry] = []
+    for trade in trades:
+        product = db.get(Product, trade.product_id)
+        if product is None:
+            continue
+        entries.append(
+            LedgerEntry(
+                trade=trade,
+                product=product,
+                uses_existing_cash=_matching_fund_flow(db, trade) is None,
+            )
+        )
+    return entries
+
+
+def get_ledger_entry(db: Session, trade_id: int) -> LedgerEntry | None:
+    trade = db.get(Trade, trade_id)
+    if trade is None:
+        return None
+    product = db.get(Product, trade.product_id)
+    if product is None:
+        return None
+    return LedgerEntry(
+        trade=trade,
+        product=product,
+        uses_existing_cash=_matching_fund_flow(db, trade) is None,
+    )
+
+
 def create_combined_buy(
     db: Session,
     trade_date: date,
@@ -179,21 +251,94 @@ def create_combined_buy(
     )
     db.flush()
     snapshot = snapshot_portfolio(db)
-    valuation = db.query(DailyValuation).filter(DailyValuation.valuation_date == trade_date).first()
-    if valuation is None:
-        db.add(
-            DailyValuation(
-                valuation_date=trade_date,
-                cash=snapshot.cash,
-                total_assets=snapshot.total_assets,
-                total_shares=snapshot.total_shares,
-                unit_nav=snapshot.unit_nav,
-            )
-        )
+    _upsert_valuation(db, trade_date)
+    db.commit()
+    return snapshot
+
+
+def update_combined_buy(
+    db: Session,
+    trade_id: int,
+    trade_date: date,
+    product_id: int,
+    amount: Decimal,
+    price: Decimal,
+    fee: Decimal,
+    use_existing_cash: bool,
+    note: str | None,
+) -> PortfolioSnapshot:
+    trade = db.get(Trade, trade_id)
+    product = db.get(Product, product_id)
+    if trade is None:
+        raise ValueError("trade not found")
+    if product is None:
+        raise ValueError("product not found")
+    if amount <= 0 or price <= 0 or fee < 0:
+        raise ValueError("amount and price must be positive; fee cannot be negative")
+
+    old_trade_date = trade.trade_date
+    flow = _matching_fund_flow(db, trade)
+    if use_existing_cash:
+        if flow is not None:
+            db.delete(flow)
     else:
-        valuation.cash = snapshot.cash
-        valuation.total_assets = snapshot.total_assets
-        valuation.total_shares = snapshot.total_shares
-        valuation.unit_nav = snapshot.unit_nav
+        if flow is None:
+            unit_nav = current_unit_nav(db)
+            flow = FundFlow(
+                flow_type="SUBSCRIBE",
+                trade_date=trade_date,
+                unit_nav=unit_nav,
+                amount=amount,
+                shares_delta=quantize_shares(amount / unit_nav),
+                note=note or f"外部投入并买入 {product.name}",
+            )
+            db.add(flow)
+        else:
+            flow.trade_date = trade_date
+            flow.amount = amount
+            flow.shares_delta = quantize_shares(amount / flow.unit_nav)
+            flow.note = note or f"外部投入并买入 {product.name}"
+
+    net_amount = amount - fee
+    if net_amount <= 0:
+        raise ValueError("amount after fee must be positive")
+
+    price_point = (
+        db.query(PricePoint)
+        .filter(
+            PricePoint.product_id == trade.product_id,
+            PricePoint.price_date == trade.trade_date,
+            PricePoint.source == "manual-entry",
+        )
+        .order_by(PricePoint.id.desc())
+        .first()
+    )
+    if price_point is None:
+        price_point = PricePoint(
+            product_id=product.id,
+            price_date=trade_date,
+            source="manual-entry",
+            status="success",
+            error_message=None,
+        )
+        db.add(price_point)
+    price_point.product_id = product.id
+    price_point.price_date = trade_date
+    price_point.price = price
+    price_point.status = "success"
+    price_point.error_message = None
+
+    trade.trade_date = trade_date
+    trade.product_id = product.id
+    trade.amount = amount
+    trade.quantity = quantize_shares(net_amount / price)
+    trade.price = price
+    trade.fee = fee
+    trade.note = note
+
+    db.flush()
+    snapshot = snapshot_portfolio(db)
+    _upsert_valuation(db, old_trade_date)
+    _upsert_valuation(db, trade_date)
     db.commit()
     return snapshot

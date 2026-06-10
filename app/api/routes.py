@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 
 from app.api import alerts, ledger, products, valuation
 from app.db.session import get_db
-from app.services.portfolio_service import create_combined_buy, snapshot_portfolio
+from app.services.portfolio_service import (
+    create_combined_buy,
+    get_ledger_entry,
+    list_recent_ledger_entries,
+    snapshot_portfolio,
+    update_combined_buy,
+)
 from app.services.product_service import get_or_create_product, list_active_products
 from app.ui.formatters import money, number4, percent
 
@@ -44,6 +50,7 @@ def ledger_page(request: Request, db: Session = Depends(get_db)):
         "ledger.html",
         {
             "products": list_active_products(db),
+            "entries": list_recent_ledger_entries(db),
             "today": date.today().isoformat(),
             "error": request.query_params.get("error"),
         },
@@ -90,6 +97,51 @@ def submit_ledger_entry(
     except ValueError as exc:
         return RedirectResponse(f"/ledger?error={str(exc)}", status_code=303)
     return RedirectResponse("/", status_code=303)
+
+
+@router.get("/ledger/trades/{trade_id}/edit")
+def edit_ledger_entry(trade_id: int, request: Request, db: Session = Depends(get_db)):
+    entry = get_ledger_entry(db, trade_id)
+    if entry is None:
+        return RedirectResponse("/ledger?error=trade not found", status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "ledger_edit.html",
+        {
+            "entry": entry,
+            "products": list_active_products(db),
+            "error": request.query_params.get("error"),
+        },
+    )
+
+
+@router.post("/ledger/trades/{trade_id}/edit")
+def update_ledger_entry(
+    trade_id: int,
+    trade_date: date = Form(...),
+    product_id: int = Form(...),
+    amount: Decimal = Form(...),
+    price: Decimal = Form(...),
+    fee: Decimal = Form(Decimal("0")),
+    use_existing_cash: bool = Form(False),
+    note: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    try:
+        update_combined_buy(
+            db=db,
+            trade_id=trade_id,
+            trade_date=trade_date,
+            product_id=product_id,
+            amount=amount,
+            price=price,
+            fee=fee,
+            use_existing_cash=use_existing_cash,
+            note=note,
+        )
+    except ValueError as exc:
+        return RedirectResponse(f"/ledger/trades/{trade_id}/edit?error={str(exc)}", status_code=303)
+    return RedirectResponse("/ledger", status_code=303)
 
 
 @router.get("/updates")

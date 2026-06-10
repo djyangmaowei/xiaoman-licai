@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="dashboard-header">
+  <div>
+    <p class="eyebrow">基金级账本</p>
+    <h1>编辑流水</h1>
+  </div>
+  <a class="status-pill" href="/ledger">返回流水</a>
+</section>
+
+{% if error %}
+  <section class="notice negative">{{ error }}</section>
+{% endif %}
+
+<section class="panel form-panel">
+  <form method="post" action="/ledger/trades/{{ entry.trade.id }}/edit">
+    <label>
+      交易日期
+      <input type="date" name="trade_date" value="{{ entry.trade.trade_date }}" required>
+    </label>
+
+    <label>
+      买入产品
+      <select name="product_id" required>
+        {% for product in products %}
+          <option value="{{ product.id }}" {% if product.id == entry.trade.product_id %}selected{% endif %}>
+            {{ product.asset_class }} · {{ product.name }} · {{ product.code }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <div class="form-grid">
+      <label>
+        买入金额
+        <input type="number" name="amount" step="0.01" min="0.01" value="{{ entry.trade.amount }}" required>
+      </label>
+      <label>
+        成交价格/净值
+        <input type="number" name="price" step="0.0001" min="0.0001" value="{{ entry.trade.price }}" required>
+      </label>
+      <label>
+        手续费
+        <input type="number" name="fee" step="0.01" min="0" value="{{ entry.trade.fee }}" required>
+      </label>
+    </div>
+
+    <label class="checkbox-row">
+      <input type="checkbox" name="use_existing_cash" value="true" {% if entry.uses_existing_cash %}checked{% endif %}>
+      这笔买入使用已有现金仓，不新增家庭基金份额
+    </label>
+
+    <label>
+      备注
+      <textarea name="note" rows="3">{{ entry.trade.note or "" }}</textarea>
+    </label>
+
+    <button class="primary-action" type="submit">保存修改</button>
+  </form>
+</section>
+{% endblock %}

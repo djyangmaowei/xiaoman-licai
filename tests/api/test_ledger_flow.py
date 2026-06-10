@@ -58,3 +58,50 @@ def test_submit_new_product_creates_product_and_reuses_it_in_list():
 
     ledger = client.get("/ledger")
     assert "白酒个股 · 贵州茅台 · 600519" in ledger.text
+
+
+def test_edit_ledger_entry_recalculates_holdings_and_shares():
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/ledger",
+        data={
+            "trade_date": "2026-06-10",
+            "product_id": "1",
+            "amount": "10000",
+            "price": "1.0000",
+            "fee": "0",
+            "note": "录错待修改",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+
+    ledger = client.get("/ledger")
+    assert "/ledger/trades/1/edit" in ledger.text
+
+    edit_page = client.get("/ledger/trades/1/edit")
+    assert "编辑流水" in edit_page.text
+    assert "录错待修改" in edit_page.text
+
+    update_response = client.post(
+        "/ledger/trades/1/edit",
+        data={
+            "trade_date": "2026-06-10",
+            "product_id": "1",
+            "amount": "12000",
+            "price": "2.0000",
+            "fee": "0",
+            "note": "已修正",
+        },
+        follow_redirects=False,
+    )
+    assert update_response.status_code == 303
+
+    dashboard = client.get("/")
+    assert "¥12,000.00" in dashboard.text
+    assert "12,000.0000" in dashboard.text
+
+    holdings = client.get("/holdings")
+    assert "6,000.0000" in holdings.text
+    assert "¥12,000.00" in holdings.text

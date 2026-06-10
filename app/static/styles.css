@@ -182,6 +182,20 @@ h2 {
   padding: 12px 18px;
 }
 
+.text-action {
+  background: var(--brand-soft);
+  border-radius: 10px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 10px;
+}
+
+.ledger-history {
+  margin-top: 18px;
+}
+
 .mini-list {
   display: grid;
   gap: 12px;
