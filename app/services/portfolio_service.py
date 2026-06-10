@@ -30,6 +30,9 @@ class PortfolioSnapshot:
     total_shares: Decimal
     total_assets: Decimal
     unit_nav: Decimal
+    invested_capital: Decimal
+    total_profit: Decimal
+    unit_nav_change: Decimal
     holdings: list[HoldingRow]
 
 
@@ -59,6 +62,11 @@ def _cash_balance(db: Session) -> Decimal:
         Trade.trade_type == "SELL"
     ).scalar()
     return quantize_money(Decimal(flow_cash) - Decimal(buy_cash) + Decimal(sell_cash))
+
+
+def _invested_capital(db: Session) -> Decimal:
+    total = db.query(func.coalesce(func.sum(FundFlow.amount), 0)).scalar()
+    return quantize_money(Decimal(total))
 
 
 def _latest_price(db: Session, product_id: int, fallback: Decimal) -> Decimal:
@@ -134,6 +142,7 @@ def _upsert_valuation(db: Session, valuation_date: date) -> None:
 def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
     cash = _cash_balance(db)
     total_shares = _total_fund_shares(db)
+    invested_capital = _invested_capital(db)
     holdings: list[HoldingRow] = []
 
     products = db.query(Product).filter(Product.is_active.is_(True)).order_by(Product.id).all()
@@ -179,6 +188,9 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
         total_shares=total_shares,
         total_assets=total_assets,
         unit_nav=unit_nav,
+        invested_capital=invested_capital,
+        total_profit=quantize_money(total_assets - invested_capital),
+        unit_nav_change=quantize_nav(unit_nav - Decimal("1.0000")),
         holdings=weighted_holdings,
     )
 

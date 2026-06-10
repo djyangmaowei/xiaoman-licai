@@ -26,6 +26,28 @@
     <span>总份额</span>
     <strong>{{ snapshot.total_shares|number4 }}</strong>
   </article>
+  <article class="metric">
+    <span>累计投入</span>
+    <strong>{{ snapshot.invested_capital|money }}</strong>
+  </article>
+  <article class="metric">
+    <span>累计收益</span>
+    <strong class="{% if snapshot.total_profit >= 0 %}positive{% else %}negative{% endif %}">
+      {{ snapshot.total_profit|money }}
+    </strong>
+  </article>
+  <article class="metric">
+    <span>累计收益率</span>
+    <strong class="{% if snapshot.unit_nav_change >= 0 %}positive{% else %}negative{% endif %}">
+      {{ snapshot.unit_nav_change|percent }}
+    </strong>
+  </article>
+  <article class="metric">
+    <span>净值涨跌</span>
+    <strong class="{% if snapshot.unit_nav_change >= 0 %}positive{% else %}negative{% endif %}">
+      {{ snapshot.unit_nav_change|number4 }}
+    </strong>
+  </article>
 </section>
 
 <section class="split-layout">

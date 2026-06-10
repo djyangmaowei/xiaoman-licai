@@ -1,6 +1,11 @@
+from datetime import date
+from decimal import Decimal
+
 from fastapi.testclient import TestClient
 
+from app.db.session import SessionLocal
 from app.main import create_app
+from app.models.market_data import PricePoint
 
 
 def test_submit_ledger_entry_updates_dashboard_and_holdings():
@@ -29,6 +34,43 @@ def test_submit_ledger_entry_updates_dashboard_and_holdings():
     holdings = client.get("/holdings")
     assert "平安中短债债券A" in holdings.text
     assert "004827" in holdings.text
+
+
+def test_dashboard_shows_fund_level_profit_metrics():
+    client = TestClient(create_app())
+
+    client.post(
+        "/ledger",
+        data={
+            "trade_date": "2026-06-10",
+            "product_id": "1",
+            "amount": "10000",
+            "price": "1.0000",
+            "fee": "0",
+            "note": "收益展示测试",
+        },
+        follow_redirects=False,
+    )
+    with SessionLocal() as db:
+        db.add(
+            PricePoint(
+                product_id=1,
+                price_date=date(2026, 6, 11),
+                price=Decimal("1.1000"),
+                source="test-price",
+                status="success",
+                error_message=None,
+            )
+        )
+        db.commit()
+
+    dashboard = client.get("/")
+
+    assert "累计投入" in dashboard.text
+    assert "累计收益" in dashboard.text
+    assert "累计收益率" in dashboard.text
+    assert "¥1,000.00" in dashboard.text
+    assert "10.00%" in dashboard.text
 
 
 def test_submit_new_product_creates_product_and_reuses_it_in_list():
