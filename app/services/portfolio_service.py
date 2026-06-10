@@ -71,7 +71,33 @@ def _latest_price(db: Session, product_id: int, fallback: Decimal) -> Decimal:
     return price.price if price and price.price is not None else fallback
 
 
+def _position_quantity(db: Session, product_id: int) -> Decimal:
+    quantity = db.query(func.coalesce(func.sum(Trade.quantity), 0)).filter(
+        Trade.product_id == product_id
+    ).scalar()
+    return quantize_shares(Decimal(quantity))
+
+
+def _position_cost(db: Session, product_id: int, quantity: Decimal) -> Decimal:
+    buy_quantity = db.query(func.coalesce(func.sum(Trade.quantity), 0)).filter(
+        Trade.product_id == product_id,
+        Trade.trade_type == "BUY",
+    ).scalar()
+    buy_quantity = quantize_shares(Decimal(buy_quantity))
+    if buy_quantity <= 0 or quantity <= 0:
+        return Decimal("0.00")
+
+    buy_cost = db.query(func.coalesce(func.sum(Trade.amount), 0)).filter(
+        Trade.product_id == product_id,
+        Trade.trade_type == "BUY",
+    ).scalar()
+    average_cost = Decimal(buy_cost) / buy_quantity
+    return quantize_money(average_cost * quantity)
+
+
 def _matching_fund_flow(db: Session, trade: Trade) -> FundFlow | None:
+    if trade.trade_type != "BUY":
+        return None
     return (
         db.query(FundFlow)
         .filter(
@@ -112,17 +138,11 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
 
     products = db.query(Product).filter(Product.is_active.is_(True)).order_by(Product.id).all()
     for product in products:
-        quantity = db.query(func.coalesce(func.sum(Trade.quantity), 0)).filter(
-            Trade.product_id == product.id
-        ).scalar()
-        quantity = quantize_shares(Decimal(quantity))
+        quantity = _position_quantity(db, product.id)
         if quantity == 0:
             continue
 
-        cost = db.query(func.coalesce(func.sum(Trade.amount + Trade.fee), 0)).filter(
-            Trade.product_id == product.id
-        ).scalar()
-        cost = quantize_money(Decimal(cost))
+        cost = _position_cost(db, product.id, quantity)
         fallback_price = cost / quantity if quantity else Decimal("0")
         price = _latest_price(db, product.id, fallback_price)
         market_value = quantize_money(quantity * price)
@@ -256,6 +276,57 @@ def create_combined_buy(
     return snapshot
 
 
+def create_sell(
+    db: Session,
+    trade_date: date,
+    product_id: int,
+    amount: Decimal,
+    price: Decimal,
+    fee: Decimal,
+    note: str | None,
+) -> PortfolioSnapshot:
+    product = db.get(Product, product_id)
+    if product is None:
+        raise ValueError("product not found")
+    if amount <= 0 or price <= 0 or fee < 0:
+        raise ValueError("amount and price must be positive; fee cannot be negative")
+
+    quantity = quantize_shares(amount / price)
+    if quantity <= 0:
+        raise ValueError("sell quantity must be positive")
+    current_quantity = _position_quantity(db, product.id)
+    if quantity > current_quantity:
+        raise ValueError("sell quantity exceeds current holding")
+
+    db.add(
+        Trade(
+            trade_type="SELL",
+            trade_date=trade_date,
+            product_id=product.id,
+            amount=amount,
+            quantity=-quantity,
+            price=price,
+            fee=fee,
+            note=note,
+        )
+    )
+    db.add(
+        PricePoint(
+            product_id=product.id,
+            price_date=trade_date,
+            price=price,
+            source="manual-entry",
+            status="success",
+            error_message=None,
+        )
+    )
+    db.flush()
+    snapshot = snapshot_portfolio(db)
+    _upsert_valuation(db, trade_date)
+    db.commit()
+    return snapshot
+
+
 def update_combined_buy(
     db: Session,
     trade_id: int,
@@ -332,6 +403,76 @@ def update_combined_buy(
     trade.product_id = product.id
     trade.amount = amount
     trade.quantity = quantize_shares(net_amount / price)
+    trade.price = price
+    trade.fee = fee
+    trade.note = note
+
+    db.flush()
+    snapshot = snapshot_portfolio(db)
+    _upsert_valuation(db, old_trade_date)
+    _upsert_valuation(db, trade_date)
+    db.commit()
+    return snapshot
+
+
+def update_sell(
+    db: Session,
+    trade_id: int,
+    trade_date: date,
+    product_id: int,
+    amount: Decimal,
+    price: Decimal,
+    fee: Decimal,
+    note: str | None,
+) -> PortfolioSnapshot:
+    trade = db.get(Trade, trade_id)
+    product = db.get(Product, product_id)
+    if trade is None:
+        raise ValueError("trade not found")
+    if trade.trade_type != "SELL":
+        raise ValueError("trade is not a sell")
+    if product is None:
+        raise ValueError("product not found")
+    if amount <= 0 or price <= 0 or fee < 0:
+        raise ValueError("amount and price must be positive; fee cannot be negative")
+
+    old_trade_date = trade.trade_date
+    new_quantity = quantize_shares(amount / price)
+    current_quantity_without_trade = _position_quantity(db, product.id)
+    if trade.product_id == product.id:
+        current_quantity_without_trade -= trade.quantity
+    if new_quantity > current_quantity_without_trade:
+        raise ValueError("sell quantity exceeds current holding")
+
+    price_point = (
+        db.query(PricePoint)
+        .filter(
+            PricePoint.product_id == trade.product_id,
+            PricePoint.price_date == trade.trade_date,
+            PricePoint.source == "manual-entry",
+        )
+        .order_by(PricePoint.id.desc())
+        .first()
+    )
+    if price_point is None:
+        price_point = PricePoint(
+            product_id=product.id,
+            price_date=trade_date,
+            source="manual-entry",
+            status="success",
+            error_message=None,
+        )
+        db.add(price_point)
+    price_point.product_id = product.id
+    price_point.price_date = trade_date
+    price_point.price = price
+    price_point.status = "success"
+    price_point.error_message = None
+
+    trade.trade_date = trade_date
+    trade.product_id = product.id
+    trade.amount = amount
+    trade.quantity = -new_quantity
     trade.price = price
     trade.fee = fee
     trade.note = note

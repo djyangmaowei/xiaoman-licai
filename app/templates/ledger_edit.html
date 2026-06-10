@@ -4,7 +4,7 @@
 <section class="dashboard-header">
   <div>
     <p class="eyebrow">基金级账本</p>
-    <h1>编辑流水</h1>
+    <h1>编辑{% if entry.trade.trade_type == "SELL" %}卖出{% else %}买入{% endif %}流水</h1>
   </div>
   <a class="status-pill" href="/ledger">返回流水</a>
 </section>
@@ -21,7 +21,7 @@
     </label>
 
     <label>
-      买入产品
+      {% if entry.trade.trade_type == "SELL" %}卖出产品{% else %}买入产品{% endif %}
       <select name="product_id" required>
         {% for product in products %}
           <option value="{{ product.id }}" {% if product.id == entry.trade.product_id %}selected{% endif %}>
@@ -33,7 +33,7 @@
 
     <div class="form-grid">
       <label>
-        买入金额
+        {% if entry.trade.trade_type == "SELL" %}卖出金额{% else %}买入金额{% endif %}
         <input type="number" name="amount" step="0.01" min="0.01" value="{{ entry.trade.amount }}" required>
       </label>
       <label>
@@ -46,10 +46,12 @@
       </label>
     </div>
 
-    <label class="checkbox-row">
-      <input type="checkbox" name="use_existing_cash" value="true" {% if entry.uses_existing_cash %}checked{% endif %}>
-      这笔买入使用已有现金仓，不新增家庭基金份额
-    </label>
+    {% if entry.trade.trade_type != "SELL" %}
+      <label class="checkbox-row">
+        <input type="checkbox" name="use_existing_cash" value="true" {% if entry.uses_existing_cash %}checked{% endif %}>
+        这笔买入使用已有现金仓，不新增家庭基金份额
+      </label>
+    {% endif %}
 
     <label>
       备注

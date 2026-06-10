@@ -15,10 +15,12 @@ from app.models.market_data import PricePoint
 from app.models.product import Product
 from app.services.portfolio_service import (
     create_combined_buy,
+    create_sell,
     get_ledger_entry,
     list_recent_ledger_entries,
     snapshot_portfolio,
     update_combined_buy,
+    update_sell,
 )
 from app.services.product_service import get_or_create_product, list_active_products
 from app.ui.formatters import money, number4, percent
@@ -102,6 +104,31 @@ def submit_ledger_entry(
     return RedirectResponse("/", status_code=303)
 
 
+@router.post("/ledger/sell")
+def submit_sell_entry(
+    trade_date: date = Form(...),
+    product_id: int = Form(...),
+    amount: Decimal = Form(...),
+    price: Decimal = Form(...),
+    fee: Decimal = Form(Decimal("0")),
+    note: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    try:
+        create_sell(
+            db=db,
+            trade_date=trade_date,
+            product_id=product_id,
+            amount=amount,
+            price=price,
+            fee=fee,
+            note=note,
+        )
+    except ValueError as exc:
+        return RedirectResponse(f"/ledger?error={str(exc)}", status_code=303)
+    return RedirectResponse("/", status_code=303)
+
+
 @router.get("/ledger/trades/{trade_id}/edit")
 def edit_ledger_entry(trade_id: int, request: Request, db: Session = Depends(get_db)):
     entry = get_ledger_entry(db, trade_id)
@@ -131,17 +158,32 @@ def update_ledger_entry(
     db: Session = Depends(get_db),
 ):
     try:
-        update_combined_buy(
-            db=db,
-            trade_id=trade_id,
-            trade_date=trade_date,
-            product_id=product_id,
-            amount=amount,
-            price=price,
-            fee=fee,
-            use_existing_cash=use_existing_cash,
-            note=note,
-        )
+        entry = get_ledger_entry(db, trade_id)
+        if entry is None:
+            raise ValueError("trade not found")
+        if entry.trade.trade_type == "SELL":
+            update_sell(
+                db=db,
+                trade_id=trade_id,
+                trade_date=trade_date,
+                product_id=product_id,
+                amount=amount,
+                price=price,
+                fee=fee,
+                note=note,
+            )
+        else:
+            update_combined_buy(
+                db=db,
+                trade_id=trade_id,
+                trade_date=trade_date,
+                product_id=product_id,
+                amount=amount,
+                price=price,
+                fee=fee,
+                use_existing_cash=use_existing_cash,
+                note=note,
+            )
     except ValueError as exc:
         return RedirectResponse(f"/ledger/trades/{trade_id}/edit?error={str(exc)}", status_code=303)
     return RedirectResponse("/ledger", status_code=303)
