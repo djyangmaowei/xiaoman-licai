@@ -14,3 +14,4 @@ def test_dashboard_contains_core_nav_items():
     assert "持仓" in response.text
     assert "流水" in response.text
     assert "预警" in response.text
+    assert "数据日期" in response.text

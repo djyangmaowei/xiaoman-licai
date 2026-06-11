@@ -26,6 +26,7 @@ class HoldingRow:
 
 @dataclass(frozen=True)
 class PortfolioSnapshot:
+    as_of_date: date
     cash: Decimal
     total_shares: Decimal
     total_assets: Decimal
@@ -67,6 +68,11 @@ def _cash_balance(db: Session) -> Decimal:
 def _invested_capital(db: Session) -> Decimal:
     total = db.query(func.coalesce(func.sum(FundFlow.amount), 0)).scalar()
     return quantize_money(Decimal(total))
+
+
+def _snapshot_date(db: Session) -> date:
+    latest = db.query(DailyValuation).order_by(DailyValuation.valuation_date.desc()).first()
+    return latest.valuation_date if latest else date.today()
 
 
 def _latest_price(db: Session, product_id: int, fallback: Decimal) -> Decimal:
@@ -184,6 +190,7 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
         for row in holdings
     ]
     return PortfolioSnapshot(
+        as_of_date=_snapshot_date(db),
         cash=cash,
         total_shares=total_shares,
         total_assets=total_assets,
