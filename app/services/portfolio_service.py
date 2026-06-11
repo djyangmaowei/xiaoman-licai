@@ -22,6 +22,8 @@ class HoldingRow:
     weight: Decimal
     target_weight: Decimal
     profit: Decimal
+    daily_change_rate: Decimal | None
+    daily_change_amount: Decimal
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,7 @@ class PortfolioSnapshot:
     invested_capital: Decimal
     total_profit: Decimal
     unit_nav_change: Decimal
+    daily_holding_change: Decimal
     holdings: list[HoldingRow]
 
 
@@ -75,14 +78,27 @@ def _snapshot_date(db: Session) -> date:
     return latest.valuation_date if latest else date.today()
 
 
-def _latest_price(db: Session, product_id: int, fallback: Decimal) -> Decimal:
-    price = (
+def _latest_price_point(db: Session, product_id: int) -> PricePoint | None:
+    return (
         db.query(PricePoint)
         .filter(PricePoint.product_id == product_id, PricePoint.status == "success")
         .order_by(PricePoint.price_date.desc(), PricePoint.id.desc())
         .first()
     )
-    return price.price if price and price.price is not None else fallback
+
+
+def _previous_price(db: Session, product_id: int, latest_date: date) -> Decimal | None:
+    price = (
+        db.query(PricePoint)
+        .filter(
+            PricePoint.product_id == product_id,
+            PricePoint.status == "success",
+            PricePoint.price_date < latest_date,
+        )
+        .order_by(PricePoint.price_date.desc(), PricePoint.id.desc())
+        .first()
+    )
+    return price.price if price and price.price is not None else None
 
 
 def _position_quantity(db: Session, product_id: int) -> Decimal:
@@ -159,7 +175,23 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
 
         cost = _position_cost(db, product.id, quantity)
         fallback_price = cost / quantity if quantity else Decimal("0")
-        price = _latest_price(db, product.id, fallback_price)
+        latest_price_point = _latest_price_point(db, product.id)
+        price = latest_price_point.price if latest_price_point and latest_price_point.price is not None else fallback_price
+        previous_price = (
+            _previous_price(db, product.id, latest_price_point.price_date)
+            if latest_price_point is not None
+            else None
+        )
+        daily_change_rate = (
+            quantize_nav((price - previous_price) / previous_price)
+            if previous_price and previous_price > 0
+            else None
+        )
+        daily_change_amount = (
+            quantize_money((price - previous_price) * quantity)
+            if previous_price is not None
+            else Decimal("0.00")
+        )
         market_value = quantize_money(quantity * price)
         holdings.append(
             HoldingRow(
@@ -171,6 +203,8 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
                 weight=Decimal("0"),
                 target_weight=product.target_weight,
                 profit=quantize_money(market_value - cost),
+                daily_change_rate=daily_change_rate,
+                daily_change_amount=daily_change_amount,
             )
         )
 
@@ -186,6 +220,8 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
             weight=quantize_nav(row.market_value / total_assets) if total_assets else Decimal("0.0000"),
             target_weight=row.target_weight,
             profit=row.profit,
+            daily_change_rate=row.daily_change_rate,
+            daily_change_amount=row.daily_change_amount,
         )
         for row in holdings
     ]
@@ -198,6 +234,9 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
         invested_capital=invested_capital,
         total_profit=quantize_money(total_assets - invested_capital),
         unit_nav_change=quantize_nav(unit_nav - Decimal("1.0000")),
+        daily_holding_change=quantize_money(
+            sum((row.daily_change_amount for row in weighted_holdings), Decimal("0"))
+        ),
         holdings=weighted_holdings,
     )
 

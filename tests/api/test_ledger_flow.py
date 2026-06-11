@@ -73,6 +73,40 @@ def test_dashboard_shows_fund_level_profit_metrics():
     assert "10.00%" in dashboard.text
 
 
+def test_dashboard_shows_holding_daily_change_attribution():
+    client = TestClient(create_app())
+
+    client.post(
+        "/ledger",
+        data={
+            "trade_date": "2026-06-10",
+            "product_id": "1",
+            "amount": "10000",
+            "price": "1.0000",
+            "fee": "0",
+            "note": "日涨跌归因测试",
+        },
+        follow_redirects=False,
+    )
+    with SessionLocal() as db:
+        db.add(
+            PricePoint(
+                product_id=1,
+                price_date=date(2026, 6, 11),
+                price=Decimal("0.9000"),
+                source="test-price",
+                status="success",
+                error_message=None,
+            )
+        )
+        db.commit()
+
+    dashboard = client.get("/")
+
+    assert "持仓日变动合计" in dashboard.text
+    assert "日涨跌 -10.00% / ¥-1,000.00" in dashboard.text
+
+
 def test_submit_new_product_creates_product_and_reuses_it_in_list():
     client = TestClient(create_app())
 

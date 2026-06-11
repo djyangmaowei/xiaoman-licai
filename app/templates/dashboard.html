@@ -54,12 +54,25 @@
   <article class="panel">
     <h2>持仓概览</h2>
     {% if snapshot.holdings %}
+      <p>
+        持仓日变动合计
+        <strong class="{% if snapshot.daily_holding_change >= 0 %}positive{% else %}negative{% endif %}">
+          {{ snapshot.daily_holding_change|money }}
+        </strong>
+      </p>
       <div class="mini-list">
         {% for row in snapshot.holdings %}
           <div class="mini-row">
             <div>
               <strong>{{ row.product.asset_class }}</strong>
               <span>{{ row.product.name }}</span>
+              {% if row.daily_change_rate is not none %}
+                <span class="{% if row.daily_change_amount >= 0 %}positive{% else %}negative{% endif %}">
+                  日涨跌 {{ row.daily_change_rate|percent }} / {{ row.daily_change_amount|money }}
+                </span>
+              {% else %}
+                <span>暂无前日价格</span>
+              {% endif %}
             </div>
             <div class="mini-number">
               <strong>{{ row.market_value|money }}</strong>
