@@ -27,6 +27,13 @@ class HoldingRow:
 
 
 @dataclass(frozen=True)
+class CategoryDailyChange:
+    asset_class: str
+    daily_change_amount: Decimal
+    daily_change_rate: Decimal | None
+
+
+@dataclass(frozen=True)
 class PortfolioSnapshot:
     as_of_date: date
     cash: Decimal
@@ -37,6 +44,7 @@ class PortfolioSnapshot:
     total_profit: Decimal
     unit_nav_change: Decimal
     daily_holding_change: Decimal
+    category_daily_changes: list[CategoryDailyChange]
     holdings: list[HoldingRow]
 
 
@@ -225,6 +233,27 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
         )
         for row in holdings
     ]
+    category_totals: dict[str, dict[str, Decimal]] = {}
+    for row in weighted_holdings:
+        category = category_totals.setdefault(
+            row.product.asset_class,
+            {"change": Decimal("0"), "previous_value": Decimal("0")},
+        )
+        category["change"] += row.daily_change_amount
+        if row.daily_change_rate is not None:
+            category["previous_value"] += row.market_value - row.daily_change_amount
+    category_daily_changes = [
+        CategoryDailyChange(
+            asset_class=asset_class,
+            daily_change_amount=quantize_money(values["change"]),
+            daily_change_rate=(
+                quantize_nav(values["change"] / values["previous_value"])
+                if values["previous_value"] > 0
+                else None
+            ),
+        )
+        for asset_class, values in category_totals.items()
+    ]
     return PortfolioSnapshot(
         as_of_date=_snapshot_date(db),
         cash=cash,
@@ -237,6 +266,7 @@ def snapshot_portfolio(db: Session) -> PortfolioSnapshot:
         daily_holding_change=quantize_money(
             sum((row.daily_change_amount for row in weighted_holdings), Decimal("0"))
         ),
+        category_daily_changes=category_daily_changes,
         holdings=weighted_holdings,
     )
 

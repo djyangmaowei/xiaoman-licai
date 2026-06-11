@@ -64,4 +64,6 @@ def test_updates_page_contains_manual_run_form():
 
     assert response.status_code == 200
     assert "更新 T+1 数据" in response.text
+    assert "当前版本未配置自动定时更新" in response.text
+    assert "请手动点击" in response.text
     assert "/updates/run" in response.text

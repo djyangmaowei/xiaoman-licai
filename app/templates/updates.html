@@ -17,6 +17,16 @@
   <section class="notice negative">{{ error }}</section>
 {% endif %}
 
+<section class="notice {% if manual_update_required %}negative{% else %}positive{% endif %}">
+  当前版本未配置自动定时更新。默认 T+1 日期为 {{ default_target_date }}，
+  最新价格日期为 {{ latest_price_date or "暂无" }}。
+  {% if manual_update_required %}
+    请手动点击“更新 T+1 数据”。
+  {% else %}
+    当前数据已覆盖默认 T+1 日期。
+  {% endif %}
+</section>
+
 <section class="panel form-panel">
   <form method="post" action="/updates/run">
     <label>
