@@ -106,6 +106,10 @@ def test_dashboard_shows_holding_daily_change_attribution():
     assert "持仓日变动合计" in dashboard.text
     assert "日涨跌 -10.00% / ¥-1,000.00" in dashboard.text
 
+    holdings = client.get("/holdings")
+    assert "持仓日变动合计" in holdings.text
+    assert "¥-1,000.00" in holdings.text
+
 
 def test_submit_new_product_creates_product_and_reuses_it_in_list():
     client = TestClient(create_app())

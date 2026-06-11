@@ -11,6 +11,12 @@
 
 <section class="panel table-panel">
   {% if snapshot.holdings %}
+    <p>
+      持仓日变动合计
+      <strong class="{% if snapshot.daily_holding_change >= 0 %}positive{% else %}negative{% endif %}">
+        {{ snapshot.daily_holding_change|money }}
+      </strong>
+    </p>
     <table>
       <thead>
         <tr>
