@@ -104,8 +104,6 @@ def test_dashboard_shows_holding_daily_change_attribution():
     dashboard = client.get("/")
 
     assert "持仓日变动合计" in dashboard.text
-    assert "类别日变动" in dashboard.text
-    assert "债券" in dashboard.text
     assert "日涨跌 -10.00% / ¥-1,000.00" in dashboard.text
 
 

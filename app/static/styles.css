@@ -201,10 +201,6 @@ h2 {
   gap: 12px;
 }
 
-.category-daily-list {
-  margin: 14px 0 18px;
-}
-
 .mini-row {
   align-items: center;
   border-bottom: 1px solid var(--line);

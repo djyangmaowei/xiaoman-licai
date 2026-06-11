@@ -60,28 +60,6 @@
           {{ snapshot.daily_holding_change|money }}
         </strong>
       </p>
-      <div class="mini-list category-daily-list">
-        {% for category in snapshot.category_daily_changes %}
-          <div class="mini-row">
-            <div>
-              <strong>{{ category.asset_class }}</strong>
-              <span>类别日变动</span>
-            </div>
-            <div class="mini-number">
-              <strong class="{% if category.daily_change_amount >= 0 %}positive{% else %}negative{% endif %}">
-                {{ category.daily_change_amount|money }}
-              </strong>
-              <span>
-                {% if category.daily_change_rate is not none %}
-                  {{ category.daily_change_rate|percent }}
-                {% else %}
-                  暂无前日价格
-                {% endif %}
-              </span>
-            </div>
-          </div>
-        {% endfor %}
-      </div>
       <div class="mini-list">
         {% for row in snapshot.holdings %}
           <div class="mini-row">

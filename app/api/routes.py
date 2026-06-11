@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter
@@ -7,7 +7,6 @@ from fastapi.requests import Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.api import alerts, ledger, products, valuation
 from app.db.session import get_db
@@ -192,8 +191,6 @@ def update_ledger_entry(
 
 @router.get("/updates")
 def updates(request: Request, db: Session = Depends(get_db)):
-    default_target_date = date.today() - timedelta(days=1)
-    latest_price_date = db.query(func.max(PricePoint.price_date)).scalar()
     raw_price_rows = (
         db.query(PricePoint, Product)
         .join(Product, Product.id == PricePoint.product_id)
@@ -213,9 +210,6 @@ def updates(request: Request, db: Session = Depends(get_db)):
         "updates.html",
         {
             "price_rows": price_rows,
-            "default_target_date": default_target_date,
-            "latest_price_date": latest_price_date,
-            "manual_update_required": latest_price_date is None or latest_price_date < default_target_date,
             "message": request.query_params.get("message"),
             "error": request.query_params.get("error"),
         },
