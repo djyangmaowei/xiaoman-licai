@@ -5,47 +5,31 @@
   <div>
     <p class="eyebrow">家庭基金净值账本</p>
     <h1>小满理财总览</h1>
+    <p class="page-subtitle">数据日期 {{ snapshot.as_of_date }} · T+1</p>
   </div>
-  <div class="status-pill">数据日期 {{ snapshot.as_of_date }}</div>
+  <div class="status-pill">数据已连接</div>
 </section>
 
-<section class="metrics-grid" aria-label="核心指标">
-  <article class="metric">
+<section class="summary-band" aria-label="核心指标">
+  <article class="summary-item">
     <span>总资产</span>
     <strong>{{ snapshot.total_assets|money }}</strong>
   </article>
-  <article class="metric">
+  <article class="summary-item">
     <span>单位净值</span>
     <strong>{{ snapshot.unit_nav|number4 }}</strong>
   </article>
-  <article class="metric">
-    <span>现金余额</span>
-    <strong>{{ snapshot.cash|money }}</strong>
-  </article>
-  <article class="metric">
-    <span>总份额</span>
-    <strong>{{ snapshot.total_shares|number4 }}</strong>
-  </article>
-  <article class="metric">
-    <span>累计投入</span>
-    <strong>{{ snapshot.invested_capital|money }}</strong>
-  </article>
-  <article class="metric">
+  <article class="summary-item">
     <span>累计收益</span>
     <strong class="{% if snapshot.total_profit >= 0 %}positive{% else %}negative{% endif %}">
       {{ snapshot.total_profit|money }}
     </strong>
+    <small>累计收益率 {{ snapshot.unit_nav_change|percent }}</small>
   </article>
-  <article class="metric">
-    <span>累计收益率</span>
-    <strong class="{% if snapshot.unit_nav_change >= 0 %}positive{% else %}negative{% endif %}">
-      {{ snapshot.unit_nav_change|percent }}
-    </strong>
-  </article>
-  <article class="metric">
-    <span>净值涨跌</span>
-    <strong class="{% if snapshot.unit_nav_change >= 0 %}positive{% else %}negative{% endif %}">
-      {{ snapshot.unit_nav_change|number4 }}
+  <article class="summary-item">
+    <span>今日持仓变动</span>
+    <strong class="{% if snapshot.daily_holding_change >= 0 %}positive{% else %}negative{% endif %}">
+      {{ snapshot.daily_holding_change|money }}
     </strong>
   </article>
 </section>
@@ -86,9 +70,32 @@
     {% endif %}
   </article>
 
-  <article class="panel accent-panel">
-    <h2>下一步</h2>
-    <p>录入“用 X 元买入 Y 产品”后，系统会同时写入外部资金流水、内部买入流水，并重新计算小满理财单位净值。</p>
+  <article class="panel side-panel">
+    <h2>组合状态</h2>
+    <div class="stat-list">
+      <div>
+        <span>现金余额</span>
+        <strong>{{ snapshot.cash|money }}</strong>
+      </div>
+      <div>
+        <span>总份额</span>
+        <strong>{{ snapshot.total_shares|number4 }}</strong>
+      </div>
+      <div>
+        <span>累计投入</span>
+        <strong>{{ snapshot.invested_capital|money }}</strong>
+      </div>
+      <div>
+        <span>净值涨跌</span>
+        <strong class="{% if snapshot.unit_nav_change >= 0 %}positive{% else %}negative{% endif %}">
+          {{ snapshot.unit_nav_change|number4 }}
+        </strong>
+      </div>
+    </div>
+    <div class="action-note">
+      <h2>下一步</h2>
+      <p>录入新的买入或卖出流水后，系统会重新计算份额、现金和净值。</p>
+    </div>
     <a class="primary-action" href="/ledger">录入流水</a>
   </article>
 </section>

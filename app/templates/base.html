@@ -8,17 +8,20 @@
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="/">
-        <span class="brand-mark">小</span>
-        <span class="brand-text">小满理财</span>
-      </a>
-      <nav class="nav" aria-label="主导航">
-        <a href="/">总览</a>
-        <a href="/holdings">持仓</a>
-        <a href="/ledger">流水</a>
-        <a href="/updates">数据更新</a>
-        <a href="/alerts">预警</a>
-      </nav>
+      <div class="topbar-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark">小</span>
+          <span class="brand-text">小满理财</span>
+        </a>
+        <nav class="nav" aria-label="主导航">
+          <a class="{% if request.url.path == '/' %}is-active{% endif %}" href="/">总览</a>
+          <a class="{% if request.url.path.startswith('/holdings') %}is-active{% endif %}" href="/holdings">持仓</a>
+          <a class="{% if request.url.path.startswith('/ledger') %}is-active{% endif %}" href="/ledger">流水</a>
+          <a class="{% if request.url.path.startswith('/updates') %}is-active{% endif %}" href="/updates">数据更新</a>
+          <a class="{% if request.url.path.startswith('/alerts') %}is-active{% endif %}" href="/alerts">预警</a>
+        </nav>
+        <a class="topbar-action" href="/ledger">录入流水</a>
+      </div>
     </header>
     <main class="page">
       {% block content %}{% endblock %}
